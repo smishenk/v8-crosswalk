@@ -269,6 +269,76 @@ TEST(ProfileTreeCalculateTotalTicks) {
 }
 
 
+TEST(CallSites){
+  //This test checks inserting and searching in tree using new structure - CallSite
+  CodeEntry entry1(i::Logger::FUNCTION_TAG, "func1");
+  CodeEntry entry2(i::Logger::FUNCTION_TAG, "func2");
+  CodeEntry entry3(i::Logger::FUNCTION_TAG, "func3");
+  i::ProfileTree tree;
+  int line1 = 134;
+  int line2 = 257;
+  int line3 = 666;
+  i::CallSite callsite1(&entry1, line1);
+  i::CallSite callsite2(&entry2, line2);
+  i::CallSite callsite3(&entry3, line3);
+
+  //CallSite structure is just an envelope for delivering pair [entry, source line] to Profile tree node
+  //It checks that CallSite does its job well
+  i::CallSite path[] = { NULL, callsite3, NULL, callsite2, callsite1, NULL };
+  Vector<i::CallSite> path_vec(path, sizeof(path) / sizeof(path[0]));
+  tree.AddPathFromEnd(path_vec);
+  ProfileNode* node = tree.root();
+  CHECK(!node->FindChild(&callsite2));
+  CHECK(!node->FindChild(&callsite3));
+  ProfileNode* node1 = node->FindChild(&callsite1);
+  CHECK(node1);
+  CHECK_EQ(0u, node1->self_ticks());
+  CHECK_EQ(line1, node1->src_line());
+  ProfileNode* node2 = node1->FindChild(&callsite2);
+  CHECK(node2);
+  CHECK_EQ(0u, node2->self_ticks());
+  CHECK_EQ(line2, node2->src_line());
+  ProfileNode* node3 = node2->FindChild(&callsite3);
+  CHECK(node3);
+  CHECK_EQ(1u, node3->self_ticks());
+  CHECK_EQ(line3, node3->src_line());
+  CHECK_NE(node1, node2);
+  CHECK_NE(node1, node3);
+  CHECK_NE(node2, node3);
+
+  //The second purpose of CallSite is to separate pairs with the same entries, but different lines to different nodes
+  int line1s = 135;
+  int line2s = 256;
+  int line3s = 667;
+  i::CallSite callsite1s(&entry1, line1s);
+  i::CallSite callsite2s(&entry2, line2s);
+  i::CallSite callsite3s(&entry3, line3s);
+  i::CallSite path2[] = { callsite3s, callsite2s, callsite1s };
+  Vector<i::CallSite> path_vec2(path2, sizeof(path2) / sizeof(path2[0]));
+
+  //It must create a separate branch in Profile tree
+  tree.AddPathFromEnd(path_vec2);
+  CHECK(!node->FindChild(&callsite2s));
+  CHECK(!node->FindChild(&callsite3s));
+  ProfileNode* node1s = node->FindChild(&callsite1s);
+  CHECK(node1s);
+  CHECK_EQ(line1s, node1s->src_line());
+  ProfileNode* node2s = node1s->FindChild(&callsite2s);
+  CHECK(node2s);
+  CHECK_EQ(line2s, node2s->src_line());
+  ProfileNode* node3s = node2s->FindChild(&callsite3s);
+  CHECK(node3s);
+  CHECK_EQ(line3s, node3s->src_line());
+  CHECK_NE(node1s, node2s);
+  CHECK_NE(node1s, node3s);
+  CHECK_NE(node2s, node3s);
+
+  CHECK_NE(node1, node1s);
+  CHECK_NE(node2, node2s);
+  CHECK_NE(node3, node3s);
+}
+
+
 static inline i::Address ToAddress(int n) {
   return reinterpret_cast<i::Address>(n);
 }

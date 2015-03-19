@@ -1114,12 +1114,20 @@ TEST(TickLines) {
   CHECK(line_info);
   CHECK(!line_info->empty());
 
+  // Get the source line of tick event and create callsite
+  int srcLine = func_entry->GetSourceLine(static_cast<int>(*code_address));
+  srcLine = srcLine == v8::CpuProfileNode::kNoLineNumberInfo ? line : srcLine;
+  i::CallSite callsite(func_entry, srcLine);
+
   // Check the hit source lines using V8 Public APIs.
   const i::ProfileTree* tree = profile->top_down();
   ProfileNode* root = tree->root();
   CHECK(root);
-  ProfileNode* func_node = root->FindChild(func_entry);
+  ProfileNode* func_node = root->FindChild(&callsite);
   CHECK(func_node);
+
+  // Received source line must be the same as in ProfileNode
+  CHECK_EQ(srcLine, func_node->src_line());
 
   // Add 10 faked ticks to source line #5.
   int hit_line = 5;

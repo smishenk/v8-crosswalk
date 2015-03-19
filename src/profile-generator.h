@@ -153,6 +153,17 @@ class CodeEntry {
 };
 
 
+struct CallSite {
+public:
+    CallSite(CodeEntry* e = NULL, int line = v8::CpuProfileNode::kNoLineNumberInfo)
+        : entry(e),
+          srcLine(line){}
+    
+    CodeEntry* entry;
+    int srcLine;
+};
+
+
 class ProfileTree;
 
 class ProfileNode {
@@ -168,15 +179,22 @@ class ProfileNode {
   };
 
  public:
-  inline ProfileNode(ProfileTree* tree, CodeEntry* entry);
+  inline ProfileNode(ProfileTree* tree, CodeEntry* entry, int src_line = v8::CpuProfileNode::kNoLineNumberInfo);
 
+  ProfileNode* FindChild(CallSite* callsite);
+  ProfileNode* FindOrAddChild(CallSite* callsite);
+
+  //Supporting old functions
   ProfileNode* FindChild(CodeEntry* entry);
   ProfileNode* FindOrAddChild(CodeEntry* entry);
+  //
+
   void IncrementSelfTicks() { ++self_ticks_; }
   void IncreaseSelfTicks(unsigned amount) { self_ticks_ += amount; }
   void IncrementLineTicks(int src_line);
 
   CodeEntry* entry() const { return entry_; }
+  int src_line() const { return src_line_; }
   unsigned self_ticks() const { return self_ticks_; }
   const List<ProfileNode*>* children() const { return &children_list_; }
   unsigned id() const { return id_; }
@@ -202,6 +220,7 @@ class ProfileNode {
 
   ProfileTree* tree_;
   CodeEntry* entry_;
+  int src_line_;
   unsigned self_ticks_;
   // Mapping from CodeEntry* to ProfileNode*
   HashMap children_;
@@ -220,8 +239,15 @@ class ProfileTree {
   ~ProfileTree();
 
   ProfileNode* AddPathFromEnd(
+      const Vector<CallSite>& path,
+      int src_line = v8::CpuProfileNode::kNoLineNumberInfo);
+
+  //Support old function
+  ProfileNode* AddPathFromEnd(
       const Vector<CodeEntry*>& path,
       int src_line = v8::CpuProfileNode::kNoLineNumberInfo);
+  //
+
   ProfileNode* root() const { return root_; }
   unsigned next_node_id() { return next_node_id_++; }
 
@@ -246,7 +272,7 @@ class CpuProfile {
   CpuProfile(const char* title, bool record_samples);
 
   // Add pc -> ... -> main() call path to the profile.
-  void AddPath(base::TimeTicks timestamp, const Vector<CodeEntry*>& path,
+  void AddPath(base::TimeTicks timestamp, const Vector<CallSite>& path,
                int src_line);
   void CalculateTotalTicksAndSamplingRate();
 
@@ -358,7 +384,7 @@ class CpuProfilesCollection {
 
   // Called from profile generator thread.
   void AddPathToCurrentProfiles(base::TimeTicks timestamp,
-                                const Vector<CodeEntry*>& path, int src_line);
+                                const Vector<CallSite>& path, int src_line);
 
   // Limits the number of profiles that can be simultaneously collected.
   static const int kMaxSimultaneousProfiles = 100;
