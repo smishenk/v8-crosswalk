@@ -153,20 +153,42 @@ void ProfileNode::CollectDeoptInfo(CodeEntry* entry) {
 
 
 ProfileNode* ProfileNode::FindChild(CodeEntry* entry) {
+  if (entry) {
+    CallSite tmp_callsite(entry, entry->line_number());
+    return ProfileNode::FindChild(&tmp_callsite);
+  }
+  return NULL;
+}
+
+
+ProfileNode* ProfileNode::FindChild(CallSite* callsite) {
   HashMap::Entry* map_entry =
-      children_.Lookup(entry, CodeEntryHash(entry), false);
+      children_.Lookup(
+          callsite->entry,
+          CodeEntryHash(callsite->entry) ^ callsite->srcLine, false);
   return map_entry != NULL ?
       reinterpret_cast<ProfileNode*>(map_entry->value) : NULL;
 }
 
 
 ProfileNode* ProfileNode::FindOrAddChild(CodeEntry* entry) {
+  if (entry) {
+    CallSite tmp_callsite(entry, entry->line_number());
+    return ProfileNode::FindOrAddChild(&tmp_callsite);
+  }
+  return NULL;
+}
+
+
+ProfileNode* ProfileNode::FindOrAddChild(CallSite* callsite) {
   HashMap::Entry* map_entry =
-      children_.Lookup(entry, CodeEntryHash(entry), true);
+      children_.Lookup(
+          callsite->entry,
+          CodeEntryHash(callsite->entry) ^ callsite->srcLine, true);
   ProfileNode* node = reinterpret_cast<ProfileNode*>(map_entry->value);
   if (node == NULL) {
     // New node added.
-    node = new ProfileNode(tree_, entry);
+    node = new ProfileNode(tree_, callsite->entry, callsite->srcLine);
     map_entry->value = node;
     children_list_.Add(node);
   }
@@ -280,14 +302,29 @@ unsigned ProfileTree::GetFunctionId(const ProfileNode* node) {
 
 ProfileNode* ProfileTree::AddPathFromEnd(const Vector<CodeEntry*>& path,
                                          int src_line) {
+  if (path.is_empty()) return root_;
+  ScopedVector<CallSite> callsites(path.length());
+  CallSite* c = callsites.start();
+  for (CodeEntry** e = path.start(); e != path.end(); e++, c++) {
+    if (*e != NULL) {
+      c->entry = *e;
+      c->srcLine = (*e)->line_number();
+    }
+  }
+  return ProfileTree::AddPathFromEnd(callsites, src_line);
+}
+
+
+ProfileNode* ProfileTree::AddPathFromEnd(const Vector<CallSite>& path,
+                                         int src_line) {
   ProfileNode* node = root_;
   CodeEntry* last_entry = NULL;
-  for (CodeEntry** entry = path.start() + path.length() - 1;
-       entry != path.start() - 1;
-       --entry) {
-    if (*entry != NULL) {
-      node = node->FindOrAddChild(*entry);
-      last_entry = *entry;
+  for (CallSite* callsite = path.start() + path.length() - 1;
+       callsite != path.start() - 1;
+       --callsite) {
+    if (callsite != NULL && callsite->entry != NULL) {
+      node = node->FindOrAddChild(callsite);
+      last_entry = node->entry();
     }
   }
   if (last_entry && last_entry->has_deopt_info()) {
@@ -359,7 +396,7 @@ CpuProfile::CpuProfile(const char* title, bool record_samples)
 
 
 void CpuProfile::AddPath(base::TimeTicks timestamp,
-                         const Vector<CodeEntry*>& path, int src_line) {
+                         const Vector<CallSite>& path, int src_line) {
   ProfileNode* top_frame_node = top_down_.AddPathFromEnd(path, src_line);
   if (record_samples_) {
     timestamps_.Add(timestamp);
@@ -527,7 +564,7 @@ void CpuProfilesCollection::RemoveProfile(CpuProfile* profile) {
 
 
 void CpuProfilesCollection::AddPathToCurrentProfiles(
-    base::TimeTicks timestamp, const Vector<CodeEntry*>& path, int src_line) {
+    base::TimeTicks timestamp, const Vector<CallSite>& path, int src_line) {
   // As starting / stopping profiles is rare relatively to this
   // method, we don't bother minimizing the duration of lock holding,
   // e.g. copying contents of the list to a local vector.
@@ -578,11 +615,10 @@ ProfileGenerator::ProfileGenerator(CpuProfilesCollection* profiles)
 
 void ProfileGenerator::RecordTickSample(const TickSample& sample) {
   // Allocate space for stack frames + pc + function + vm-state.
-  ScopedVector<CodeEntry*> entries(sample.frames_count + 3);
+  ScopedVector<CallSite> callsites(sample.frames_count + 3);
   // As actual number of decoded code entries may vary, initialize
   // entries vector with NULL values.
-  CodeEntry** entry = entries.start();
-  memset(entry, 0, entries.length() * sizeof(*entry));
+  CallSite* callsite = callsites.start();
 
   // The ProfileNode knows nothing about all versions of generated code for
   // the same JS function. The line number information associated with
@@ -598,7 +634,8 @@ void ProfileGenerator::RecordTickSample(const TickSample& sample) {
       // Don't use PC when in external callback code, as it can point
       // inside callback's code, and we will erroneously report
       // that a callback calls itself.
-      *entry++ = code_map_.FindEntry(sample.external_callback);
+      callsite->entry = code_map_.FindEntry(sample.external_callback);
+      callsite++;
     } else {
       Address start;
       CodeEntry* pc_entry = code_map_.FindEntry(sample.pc, &start);
@@ -618,12 +655,14 @@ void ProfileGenerator::RecordTickSample(const TickSample& sample) {
             }
           }
         }
-        src_line = pc_entry->GetSourceLine(pc_offset);
-        if (src_line == v8::CpuProfileNode::kNoLineNumberInfo) {
-          src_line = pc_entry->line_number();
+        callsite->entry = pc_entry;
+        callsite->srcLine = pc_entry->GetSourceLine(pc_offset);
+        if (callsite->srcLine == v8::CpuProfileNode::kNoLineNumberInfo) {
+          callsite->srcLine = pc_entry->line_number();
         }
+        src_line = callsite->srcLine;
         src_line_not_found = false;
-        *entry++ = pc_entry;
+        callsite++;
 
         if (pc_entry->builtin_id() == Builtins::kFunctionCall ||
             pc_entry->builtin_id() == Builtins::kFunctionApply) {
@@ -633,7 +672,8 @@ void ProfileGenerator::RecordTickSample(const TickSample& sample) {
           // former case we don't so we simply replace the frame with
           // 'unresolved' entry.
           if (sample.top_frame_type == StackFrame::JAVA_SCRIPT) {
-            *entry++ = unresolved_entry_;
+            callsite->entry = unresolved_entry_;
+            callsite++;
           }
         }
       }
@@ -644,39 +684,45 @@ void ProfileGenerator::RecordTickSample(const TickSample& sample) {
          stack_pos != stack_end;
          ++stack_pos) {
       Address start = NULL;
-      *entry = code_map_.FindEntry(*stack_pos, &start);
 
-      // Skip unresolved frames (e.g. internal frame) and get source line of
-      // the first JS caller.
-      if (src_line_not_found && *entry) {
+      callsite->entry = code_map_.FindEntry(*stack_pos, &start);
+
+      // Skip unresolved frames (e.g. internal frame) and get source lines for
+      // each entry. Save source line (src_line) of the first JS caller
+      if (callsite->entry) {
         int pc_offset =
-            static_cast<int>(*stack_pos - (*entry)->instruction_start());
-        src_line = (*entry)->GetSourceLine(pc_offset);
-        if (src_line == v8::CpuProfileNode::kNoLineNumberInfo) {
-          src_line = (*entry)->line_number();
+            static_cast<int>(*stack_pos - callsite->entry->instruction_start());
+        callsite->srcLine = callsite->entry->GetSourceLine(pc_offset);
+        if (callsite->srcLine == v8::CpuProfileNode::kNoLineNumberInfo) {
+          callsite->srcLine = callsite->entry->line_number();
         }
-        src_line_not_found = false;
+
+        if (src_line_not_found) {
+          src_line = callsite->srcLine;
+          src_line_not_found = false;
+        }
       }
 
-      entry++;
+      callsite++;
     }
   }
 
   if (FLAG_prof_browser_mode) {
     bool no_symbolized_entries = true;
-    for (CodeEntry** e = entries.start(); e != entry; ++e) {
-      if (*e != NULL) {
+    for (CallSite* e = callsites.start(); e != callsite; ++e) {
+      if (e->entry != NULL) {
         no_symbolized_entries = false;
         break;
       }
     }
     // If no frames were symbolized, put the VM state entry in.
     if (no_symbolized_entries) {
-      *entry++ = EntryForVMState(sample.state);
+      callsite->entry = EntryForVMState(sample.state);
+      callsite++;
     }
   }
 
-  profiles_->AddPathToCurrentProfiles(sample.timestamp, entries, src_line);
+  profiles_->AddPathToCurrentProfiles(sample.timestamp, callsites, src_line);
 }
 
 
