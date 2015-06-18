@@ -479,17 +479,18 @@ static void CheckChildrenNames(const v8::CpuProfileNode* node,
 }
 
 
-static std::vector<const v8::CpuProfileNode*> FindChild(const std::vector<const v8::CpuProfileNode*> nodes,
-  const char* name) {
+static std::vector<const v8::CpuProfileNode*> FindChild(
+    const std::vector<const v8::CpuProfileNode*>& nodes,
+    const char* name) {
   v8::Handle<v8::String> nameHandle = v8_str(name);
   std::vector<const v8::CpuProfileNode*> resultNodes;
-  for (unsigned int i = 0; i < nodes.size(); i++) {
-    if (nodes[i]){
+  for (size_t i = 0; i < nodes.size(); i++) {
+    if (nodes[i]) {
       int count = nodes[i]->GetChildrenCount();
       for (int j = 0; j < count; j++) {
         const v8::CpuProfileNode* child = nodes[i]->GetChild(j);
-        if (child){
-          if (nameHandle->Equals(child->GetFunctionName()))  resultNodes.push_back(child);
+        if (child && nameHandle->Equals(child->GetFunctionName())) {
+          resultNodes.push_back(child);
         }
       }
     }
@@ -497,8 +498,9 @@ static std::vector<const v8::CpuProfileNode*> FindChild(const std::vector<const 
   return resultNodes;
 }
 
-static std::vector<const v8::CpuProfileNode*> GetChild(const std::vector<const v8::CpuProfileNode*> nodes,
-  const char* name) {
+static std::vector<const v8::CpuProfileNode*> GetChild(
+    const std::vector<const v8::CpuProfileNode*>& nodes,
+    const char* name) {
   std::vector<const v8::CpuProfileNode*> result = FindChild(nodes, name);
   if (result.empty()) {
     char buffer[100];
@@ -509,8 +511,9 @@ static std::vector<const v8::CpuProfileNode*> GetChild(const std::vector<const v
   return result;
 }
 
-static const std::vector<const v8::CpuProfileNode*> GetChildOnes(const v8::CpuProfileNode* node,
-  const char* name) {
+static const std::vector<const v8::CpuProfileNode*> GetChildOnes(
+    const v8::CpuProfileNode* node,
+    const char* name) {
   std::vector<const v8::CpuProfileNode*> nodes(1);
   nodes[0] = node;
 
@@ -518,8 +521,9 @@ static const std::vector<const v8::CpuProfileNode*> GetChildOnes(const v8::CpuPr
   return result;
 }
 
-static const std::vector<const v8::CpuProfileNode*> FindChildOnes(const v8::CpuProfileNode* node,
-  const char* name) {
+static const std::vector<const v8::CpuProfileNode*> FindChildOnes(
+    const v8::CpuProfileNode* node,
+    const char* name) {
   std::vector<const v8::CpuProfileNode*> nodes(1);
   nodes[0] = node;
 
@@ -536,15 +540,16 @@ static void CheckExistingBranch(std::vector<const v8::CpuProfileNode*> node,
 }
 
 
-static std::vector<const ProfileNode*> GetSimpleBranchExt(v8::CpuProfile* profile,
-  const char* names[], int length) {
+static std::vector<const ProfileNode*> GetSimpleBranchExt(
+    v8::CpuProfile* profile,
+    const char* names[], int length) {
   const v8::CpuProfileNode* node = profile->GetTopDownRoot();
   std::vector<const v8::CpuProfileNode*> nodes = GetChildOnes(node, names[0]);
   for (int i = 1; i < length; i++) {
     nodes = GetChild(nodes, names[i]);
   }
   std::vector<const ProfileNode*> resultNodes;
-  for (unsigned int i = 0; i < nodes.size(); i++) {
+  for (size_t i = 0; i < nodes.size(); i++) {
     resultNodes.push_back(reinterpret_cast<const ProfileNode*>(nodes[i]));
   }
   return resultNodes;
@@ -623,9 +628,11 @@ TEST(CollectCpuProfile) {
   names[2] = v8_str("start");
   CheckChildrenNames(root, names);
 
-  const std::vector<const v8::CpuProfileNode*> startNode = GetChildOnes(root, "start");
+  const std::vector<const v8::CpuProfileNode*> startNode = 
+      GetChildOnes(root, "start");
 
-  const std::vector<const v8::CpuProfileNode*> fooNode = GetChild(startNode, "foo");
+  const std::vector<const v8::CpuProfileNode*> fooNode = 
+      GetChild(startNode, "foo");
 
   const char* barBranch[] = { "bar", "delay", "loop" };
   CheckExistingBranch(fooNode, barBranch, arraysize(barBranch));
@@ -689,7 +696,8 @@ TEST(HotDeoptNoFrameEntry) {
   names[2] = v8_str("start");
   CheckChildrenNames(root, names);
 
-  const std::vector<const v8::CpuProfileNode*> startNode = GetChildOnes(root, "start");
+  const std::vector<const v8::CpuProfileNode*> startNode = 
+      GetChildOnes(root, "start");
 
   GetChild(startNode, "foo");
 
@@ -773,14 +781,16 @@ TEST(SampleWhenFrameIsNotSetup) {
   names[2] = v8_str("start");
   CheckChildrenNames(root, names);
 
-  const std::vector<const v8::CpuProfileNode*> startNode = FindChildOnes(root, "start");
+  const std::vector<const v8::CpuProfileNode*> startNode = 
+      FindChildOnes(root, "start");
   // On slow machines there may be no meaningfull samples at all, skip the
   // check there.
-  if (!startNode.empty()){
-    for (unsigned int i = 0; i < startNode.size(); i++) {
+  if (!startNode.empty()) {
+    for (size_t i = 0; i < startNode.size(); i++) {
       if (startNode[i]->GetChildrenCount() > 0) {
-        const std::vector<const v8::CpuProfileNode*> delayNode = GetChild(startNode, "delay");
-        for (unsigned int j = 0; j < delayNode.size(); j++) {
+        const std::vector<const v8::CpuProfileNode*> delayNode = 
+            GetChild(startNode, "delay");
+        for (size_t j = 0; j < delayNode.size(); j++) {
           if (delayNode[j]->GetChildrenCount() > 0) {
             GetChild(delayNode, "loop");
             break;
@@ -882,8 +892,8 @@ TEST(NativeAccessorUninitializedIC) {
       RunProfiler(env.local(), function, args, arraysize(args), 180);
 
   const v8::CpuProfileNode* root = profile->GetTopDownRoot();
-  //const v8::CpuProfileNode* startNode = GetChild(root, "start");
-  std::vector <const v8::CpuProfileNode*> startNode = GetChildOnes(root, "start");
+  std::vector <const v8::CpuProfileNode*> startNode = 
+      GetChildOnes(root, "start");
   GetChild(startNode, "get foo");
   GetChild(startNode, "set foo");
 
@@ -934,8 +944,8 @@ TEST(NativeAccessorMonomorphicIC) {
       RunProfiler(env.local(), function, args, arraysize(args), 200);
 
   const v8::CpuProfileNode* root = profile->GetTopDownRoot();
-  //const v8::CpuProfileNode* startNode = GetChild(root, "start");
-  std::vector <const v8::CpuProfileNode*> startNode = GetChildOnes(root, "start");
+  std::vector <const v8::CpuProfileNode*> startNode = 
+      GetChildOnes(root, "start");
   GetChild(startNode, "get foo");
   GetChild(startNode, "set foo");
 
@@ -984,7 +994,8 @@ TEST(NativeMethodUninitializedIC) {
       RunProfiler(env.local(), function, args, arraysize(args), 100);
 
   const v8::CpuProfileNode* root = profile->GetTopDownRoot();
-  const std::vector<const v8::CpuProfileNode*> startNode = GetChildOnes(root, "start");
+  const std::vector<const v8::CpuProfileNode*> startNode = 
+      GetChildOnes(root, "start");
   GetChild(startNode, "fooMethod");
 
   profile->Delete();
@@ -1037,7 +1048,8 @@ TEST(NativeMethodMonomorphicIC) {
 
   const v8::CpuProfileNode* root = profile->GetTopDownRoot();
   GetChildOnes(root, "start");
-  const std ::vector<const v8::CpuProfileNode*> startNode = GetChildOnes(root, "start");
+  const std ::vector<const v8::CpuProfileNode*> startNode = 
+      GetChildOnes(root, "start");
   GetChild(startNode, "fooMethod");
 
   profile->Delete();
@@ -1072,7 +1084,8 @@ TEST(BoundFunctionCall) {
   // Don't allow |foo| node to be at the top level.
   CheckChildrenNames(root, names);
 
-  const std::vector<const v8::CpuProfileNode*> startNode = GetChildOnes(root, "start");
+  const std::vector<const v8::CpuProfileNode*> startNode = 
+      GetChildOnes(root, "start");
   GetChild(startNode, "foo");
 
   profile->Delete();
@@ -1243,13 +1256,14 @@ TEST(FunctionCallSample) {
   // won't be |start| node in the profiles.
   bool is_gc_stress_testing =
       (i::FLAG_gc_interval != -1) || i::FLAG_stress_compaction;
-  const std::vector<const v8::CpuProfileNode*> startNode = FindChildOnes(root, "start");
+  const std::vector<const v8::CpuProfileNode*> startNode = 
+      FindChildOnes(root, "start");
   CHECK(is_gc_stress_testing || !startNode.empty());
   if (!startNode.empty()) {
     ScopedVector<v8::Handle<v8::String> > names(2);
     names[0] = v8_str("bar");
     names[1] = v8_str("call");
-    for (unsigned int i = 0; i < startNode.size(); i++) {
+    for (size_t i = 0; i < startNode.size(); i++) {
       CheckChildrenNames(startNode[i], names);
     }
   }
@@ -1259,7 +1273,7 @@ TEST(FunctionCallSample) {
   if (!unresolvedNode.empty()) {
     ScopedVector<v8::Handle<v8::String> > names(1);
     names[0] = v8_str("call");
-    for (unsigned int i = 0; i < unresolvedNode.size(); i++) {
+    for (size_t i = 0; i < unresolvedNode.size(); i++) {
       CheckChildrenNames(unresolvedNode[i], names);
     }
   }
@@ -1319,18 +1333,20 @@ TEST(FunctionApplySample) {
     CheckChildrenNames(root, names);
   }
 
-  const std::vector<const v8::CpuProfileNode*> startNode = FindChildOnes(root, "start");
+  const std::vector<const v8::CpuProfileNode*> startNode = 
+      FindChildOnes(root, "start");
   if (!startNode.empty()) {
     {
       ScopedVector<v8::Handle<v8::String> > names(2);
       names[0] = v8_str("test");
       names[1] = v8_str(ProfileGenerator::kUnresolvedFunctionName);
-      for (unsigned int i = 0; i < startNode.size(); i++) {
+      for (size_t i = 0; i < startNode.size(); i++) {
         CheckChildrenNames(startNode[i], names);
       }
     }
 
-    const std::vector<const v8::CpuProfileNode*> testNode = FindChild(startNode, "test");
+    const std::vector<const v8::CpuProfileNode*> testNode = 
+        FindChild(startNode, "test");
     if (!testNode.empty()) {
       ScopedVector<v8::Handle<v8::String> > names(3);
       names[0] = v8_str("bar");
@@ -1338,7 +1354,7 @@ TEST(FunctionApplySample) {
       // apply calls "get length" before invoking the function itself
       // and we may get hit into it.
       names[2] = v8_str("get length");
-      for (unsigned int i = 0; i < testNode.size(); i++) {
+      for (size_t i = 0; i < testNode.size(); i++) {
         CheckChildrenNames(testNode[i], names);
       }
     }
@@ -1348,7 +1364,7 @@ TEST(FunctionApplySample) {
     if (!unresolvedNode.empty()) {
       ScopedVector<v8::Handle<v8::String> > names(1);
       names[0] = v8_str("apply");
-      for (unsigned int i = 0; i < unresolvedNode.size(); i++) {
+      for (size_t i = 0; i < unresolvedNode.size(); i++) {
         CheckChildrenNames(unresolvedNode[i], names);
       }
       GetChild(unresolvedNode, "apply");
@@ -1471,11 +1487,12 @@ TEST(JsNativeJsSample) {
     CheckChildrenNames(root, names);
   }
 
-  const std::vector<const v8::CpuProfileNode*> startNode = GetChildOnes(root, "start");
+  const std::vector<const v8::CpuProfileNode*> startNode = 
+      GetChildOnes(root, "start");
   const std::vector<const v8::CpuProfileNode*> nativeFunctionNode =
       GetChild(startNode, "CallJsFunction");
-
-  const std::vector<const v8::CpuProfileNode*> barNode = GetChild(nativeFunctionNode, "bar");
+  const std::vector<const v8::CpuProfileNode*> barNode = 
+      GetChild(nativeFunctionNode, "bar");
 
   GetChild(barNode, "foo");
 
@@ -1528,11 +1545,12 @@ TEST(JsNativeJsRuntimeJsSample) {
   names[2] = v8_str("start");
   CheckChildrenNames(root, names);
 
-  const std::vector<const v8::CpuProfileNode*> startNode = GetChildOnes(root, "start");
+  const std::vector<const v8::CpuProfileNode*> startNode = 
+      GetChildOnes(root, "start");
   const std::vector<const v8::CpuProfileNode*> nativeFunctionNode =
       GetChild(startNode, "CallJsFunction");
-
-  const std::vector<const v8::CpuProfileNode*> barNode = GetChild(nativeFunctionNode, "bar");
+  const std::vector<const v8::CpuProfileNode*> barNode = 
+      GetChild(nativeFunctionNode, "bar");
 
   GetChild(barNode, "foo");
 
@@ -1598,13 +1616,14 @@ TEST(JsNative1JsNative2JsSample) {
   names[2] = v8_str("start");
   CheckChildrenNames(root, names);
 
-  const std::vector<const v8::CpuProfileNode*> startNode = GetChildOnes(root, "start");
+  const std::vector<const v8::CpuProfileNode*> startNode = 
+      GetChildOnes(root, "start");
   const std::vector<const v8::CpuProfileNode*> nativeNode1 =
       GetChild(startNode, "CallJsFunction1");
-
-  const std::vector<const v8::CpuProfileNode*> barNode = GetChild(nativeNode1, "bar");
-
-  const std::vector<const v8::CpuProfileNode*> nativeNode2 = GetChild(barNode, "CallJsFunction2");
+  const std::vector<const v8::CpuProfileNode*> barNode = 
+      GetChild(nativeNode1, "bar");
+  const std::vector<const v8::CpuProfileNode*> nativeNode2 = 
+      GetChild(barNode, "CallJsFunction2");
 
   GetChild(nativeNode2, "foo");
 
@@ -1654,7 +1673,7 @@ TEST(IdleTime) {
   unsigned int hitCount = 0;
   const std::vector<const v8::CpuProfileNode*> programNode =
       GetChildOnes(root, ProfileGenerator::kProgramEntryName);
-  for (unsigned int i = 0; i < programNode.size(); i++) {
+  for (size_t i = 0; i < programNode.size(); i++) {
     childrenCount += programNode[i]->GetChildrenCount();
     hitCount += programNode[i]->GetHitCount();
   }
@@ -1665,7 +1684,7 @@ TEST(IdleTime) {
 
   const std::vector<const v8::CpuProfileNode*> idleNode =
       GetChildOnes(root, ProfileGenerator::kIdleEntryName);
-  for (unsigned int i = 0; i < idleNode.size(); i++) {
+  for (size_t i = 0; i < idleNode.size(); i++) {
     childrenCount += idleNode[i]->GetChildrenCount();
     hitCount += idleNode[i]->GetHitCount();
   }
@@ -1716,22 +1735,22 @@ TEST(FunctionDetails) {
   //  1          bar 18 #5 no reason script_a:3
   const v8::CpuProfileNode* root = profile->GetTopDownRoot();
   const std::vector<const v8::CpuProfileNode*> script = GetChildOnes(root, "");
-  for (unsigned int i = 0; i < script.size(); i++) {
+  for (size_t i = 0; i < script.size(); i++) {
     CheckFunctionDetails(env->GetIsolate(), script[i], "", "script_b",
       script_b->GetUnboundScript()->GetId(), 1, 1);
   }
   const std::vector<const v8::CpuProfileNode*> baz = GetChild(script, "baz");
-  for (unsigned int i = 0; i < baz.size(); i++) {
+  for (size_t i = 0; i < baz.size(); i++) {
     CheckFunctionDetails(env->GetIsolate(), baz[i], "baz", "script_b",
       script_b->GetUnboundScript()->GetId(), 3, 16);
   }
   const std::vector<const v8::CpuProfileNode*> foo = GetChild(baz, "foo");
-  for (unsigned int i = 0; i < foo.size(); i++) {
+  for (size_t i = 0; i < foo.size(); i++) {
     CheckFunctionDetails(env->GetIsolate(), foo[i], "foo", "script_a",
       script_a->GetUnboundScript()->GetId(), 2, 1);
   }
   const std::vector<const v8::CpuProfileNode*> bar = GetChild(foo, "bar");
-  for (unsigned int i = 0; i < bar.size(); i++) {
+  for (size_t i = 0; i < bar.size(); i++) {
     CheckFunctionDetails(env->GetIsolate(), bar[i], "bar", "script_a",
       script_a->GetUnboundScript()->GetId(), 3, 14);
   }
@@ -1774,9 +1793,10 @@ TEST(DontStopOnFinishedProfileDelete) {
 const char* GetBranchDeoptReason(i::CpuProfile* iprofile, const char* branch[],
                                  int length) {
   v8::CpuProfile* profile = reinterpret_cast<v8::CpuProfile*>(iprofile);
-  const std::vector<const ProfileNode*> iopt_function = GetSimpleBranchExt(profile, branch, length);
+  const std::vector<const ProfileNode*> iopt_function = 
+      GetSimpleBranchExt(profile, branch, length);
   unsigned int u = 0;
-  for (unsigned int i = 0; i < iopt_function.size(); i++) {
+  for (size_t i = 0; i < iopt_function.size(); i++) {
     if (iopt_function[i]->deopt_infos().size() != 0) {
       CHECK_EQ(1, iopt_function[i]->deopt_infos().size());
       u = i;
@@ -1961,7 +1981,7 @@ TEST(DeoptAtFirstLevelInlinedSource) {
   const std::vector<const ProfileNode*> itest_nodes =
       GetSimpleBranchExt(profile, branch, arraysize(branch));
   std::vector<i::DeoptInfo> deopt_infos;
-  for (unsigned int i = 0; i < itest_nodes.size(); i++) {
+  for (size_t i = 0; i < itest_nodes.size(); i++) {
     if (itest_nodes[i]->deopt_infos().size() != 0)
       deopt_infos = itest_nodes[i]->deopt_infos();
   }
@@ -2037,7 +2057,7 @@ TEST(DeoptAtSecondLevelInlinedSource) {
   const std::vector<const ProfileNode*> itest_nodes =
       GetSimpleBranchExt(profile, branch, arraysize(branch));
   std::vector<i::DeoptInfo> deopt_infos;
-  for (unsigned int i = 0; i < itest_nodes.size(); i++) {
+  for (size_t i = 0; i < itest_nodes.size(); i++) {
     if (itest_nodes[i]->deopt_infos().size() != 0)
       deopt_infos = itest_nodes[i]->deopt_infos();
   }
@@ -2097,7 +2117,7 @@ TEST(DeoptUntrackedFunction) {
   const char* branch[] = {"", "test"};
   const std::vector<const ProfileNode*> itest_nodes =
       GetSimpleBranchExt(profile, branch, arraysize(branch));
-  for (unsigned int i = 0; i < itest_nodes.size(); i++) {
+  for (size_t i = 0; i < itest_nodes.size(); i++) {
       CHECK_EQ(0, itest_nodes[i]->deopt_infos().size());
   }
   iprofiler->DeleteProfile(iprofile);
