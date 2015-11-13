@@ -562,6 +562,7 @@ DEFINE_BOOL(hard_abort, true, "abort by crashing")
 // execution.cc
 DEFINE_INT(stack_size, V8_DEFAULT_STACK_SIZE_KB,
            "default size of stack region v8 is allowed to use (in kBytes)")
+DEFINE_BOOL(enable_optimizing_compiler, true, "enable optimization")
 
 // frames.cc
 DEFINE_INT(max_stack_trace_source_length, 300,

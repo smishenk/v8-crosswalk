@@ -456,7 +456,11 @@ void CpuProfiler::StartProfiling(const char* title, bool record_samples) {
 }
 
 
-void CpuProfiler::StartProfiling(String* title, bool record_samples) {
+void CpuProfiler::StartProfiling(String* title, bool record_samples, bool disable_optimizing_compiler) {
+  if (disable_optimizing_compiler) {
+    FLAG_enable_optimizing_compiler = false;
+    Deoptimizer::DeoptimizeAll(isolate_);
+  }
   StartProfiling(profiles_->GetName(title), record_samples);
 }
 
@@ -506,6 +510,7 @@ CpuProfile* CpuProfiler::StopProfiling(String* title) {
   if (!is_profiling_) return NULL;
   const char* profile_title = profiles_->GetName(title);
   StopProcessorIfLastProfile(profile_title);
+  FLAG_enable_optimizing_compiler = true;
   return profiles_->StopProfiling(profile_title);
 }
 

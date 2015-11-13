@@ -205,7 +205,7 @@ class CpuProfiler : public CodeEventListener {
 
   void set_sampling_interval(base::TimeDelta value);
   void StartProfiling(const char* title, bool record_samples = false);
-  void StartProfiling(String* title, bool record_samples);
+  void StartProfiling(String* title, bool record_samples, bool disable_optimizing_compiler = false);
   CpuProfile* StopProfiling(const char* title);
   CpuProfile* StopProfiling(String* title);
   int GetProfilesCount();

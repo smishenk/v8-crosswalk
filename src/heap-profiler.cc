@@ -5,6 +5,7 @@
 #include "src/v8.h"
 
 #include "src/heap-profiler.h"
+#include "src/deoptimizer.h"
 
 #include "src/allocation-tracker.h"
 #include "src/heap-snapshot-generator-inl.h"
@@ -109,6 +110,8 @@ void HeapProfiler::StopHeapObjectsTracking() {
 
 void HeapProfiler::StartHeapObjectsTrackingXDK(int stackDepth,
     bool retentions, bool strict_collection) {
+  FLAG_enable_optimizing_compiler = false;
+  Deoptimizer::DeoptimizeAll(v8::internal::Isolate::Current());
   ids_->UpdateHeapObjectsMap();
   is_tracking_object_moves_ = true;
   DCHECK(!is_tracking_allocations());
@@ -143,6 +146,7 @@ v8::internal::HeapEventXDK* HeapProfiler::StopHeapObjectsTrackingXDK() {
     allocation_tracker_xdk_.Reset(NULL);
     heap()->EnableInlineAllocation();
   }
+  FLAG_enable_optimizing_compiler = true;
   return event;
 }
 

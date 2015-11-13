@@ -7946,9 +7946,9 @@ void CpuProfiler::SetSamplingInterval(int us) {
 }
 
 
-void CpuProfiler::StartProfiling(Local<String> title, bool record_samples) {
+void CpuProfiler::StartProfiling(Local<String> title, bool disable_optimizing_compiler, bool record_samples) {
   reinterpret_cast<i::CpuProfiler*>(this)->StartProfiling(
-      *Utils::OpenHandle(*title), record_samples);
+      *Utils::OpenHandle(*title), record_samples, disable_optimizing_compiler);
 }
 
 

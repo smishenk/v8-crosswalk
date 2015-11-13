@@ -658,7 +658,10 @@ Object* StackGuard::HandleInterrupts() {
 
   isolate_->counters()->stack_interrupts()->Increment();
   isolate_->counters()->runtime_profiler_ticks()->Increment();
-  isolate_->runtime_profiler()->OptimizeNow();
+  
+  if (FLAG_enable_optimizing_compiler) {
+    isolate_->runtime_profiler()->OptimizeNow();
+  }
 
   return isolate_->heap()->undefined_value();
 }

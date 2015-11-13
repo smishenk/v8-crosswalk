@@ -216,7 +216,7 @@ class V8_EXPORT CpuProfiler {
    * |record_samples| parameter controls whether individual samples should
    * be recorded in addition to the aggregated tree.
    */
-  void StartProfiling(Local<String> title, bool record_samples = false);
+  void StartProfiling(Local<String> title, bool disable_optimizing_compiler = false, bool record_samples = false);
 
   /**
    * Stops collecting CPU profile with a given title and returns it.
